@@ -11,6 +11,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "clipboardy": "^5.3.1",
     "dotenv": "^17.4.2",
     "supermemory": "^4.24.12",
     "ws": "^8.21.0",
