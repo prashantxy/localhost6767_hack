@@ -11,16 +11,12 @@ const CONTAINER = "memorylens_v2";
 /* =====================================================
    STORE MEMORY
 ===================================================== */
-
 export async function storeMemory(context: Context) {
   try {
     const text = extractText(context);
+    if (!text) return null;
 
-    if (!text) {
-      return null;
-    }
-
-    if (isNoise(text)) {
+    if (isNoise(text, context)) {
       console.log("🚫 Ignored noise");
       return null;
     }
@@ -40,12 +36,7 @@ export async function storeMemory(context: Context) {
       return null;
     }
 
-    const content = buildMemoryContent({
-      text,
-      context,
-      category,
-      importance,
-    });
+    const content = buildMemoryContent({ text, context, category, importance });
 
     const result = await client.add({
       content,
@@ -63,6 +54,7 @@ export async function storeMemory(context: Context) {
 
     console.log("✅ MEMORY STORED:", result.id);
     return result;
+
   } catch (error: any) {
     console.error("❌ Store Error:", error.message);
     return null;
@@ -72,22 +64,24 @@ export async function storeMemory(context: Context) {
 /* =====================================================
    SEARCH MEMORY
 ===================================================== */
-
 export async function searchMemory(query: string) {
   try {
-    if (!query.trim()) {
-      return [];
-    }
+    if (!query.trim()) return [];
 
     const result = await client.search.execute({
-      q: `User preference and context.\n\nQuery:\n${query}`,
+      q: query,
       containerTag: CONTAINER,
-      limit: 8,
+      limit: 10,
     });
 
-    return (result.results ?? [])
-      .filter((item: any) => item.score > 0.45)
-      .sort((a: any, b: any) => b.score - a.score);
+    return (result.results ?? []).map((item: any) => ({
+      id: item.documentId,
+      content: item.chunks?.map((chunk: any) => chunk.content).join("\n") ?? "",
+      title: item.title ?? "",
+      score: item.score ?? 0,
+      metadata: item.metadata ?? {},
+    }));
+
   } catch (error: any) {
     console.error("❌ Search Error:", error.message);
     return [];
@@ -97,24 +91,17 @@ export async function searchMemory(query: string) {
 /* =====================================================
    STORE + SEARCH
 ===================================================== */
-
 export async function storeAndSearch(context: Context) {
   const text = extractText(context);
-
-  if (!text) {
-    return [];
-  }
+  if (!text) return [];
 
   await storeMemory(context);
-  await sleep(1500);
-
   return searchMemory(text);
 }
 
 /* =====================================================
    MEMORY BUILDER
 ===================================================== */
-
 function buildMemoryContent({
   text,
   context,
@@ -126,27 +113,28 @@ function buildMemoryContent({
   category: string;
   importance: string;
 }) {
-  return `Memory Type: User Preference Memory
+  return `
+Memory Type: User Context Memory
 Category: ${category}
 Importance: ${importance}
-User Statement: ${text}
+
+User Information:
+${text}
+
 Application: ${context.app ?? "Unknown"}
 Window: ${context.windowTitle ?? "Unknown"}
 
-This memory describes stable user preferences, interests, habits, or useful long-term context.`;
+This memory contains useful long-term user context, preferences, interests, projects, or habits.
+`.trim();
 }
 
 /* =====================================================
    DUPLICATE CHECK
 ===================================================== */
-
 async function checkDuplicate(text: string) {
   try {
     const result = await searchMemory(text);
-
-    if (!result.length) {
-      return false;
-    }
+    if (!result.length) return false;
 
     return (result[0]?.score ?? 0) > 0.88;
   } catch {
@@ -157,7 +145,6 @@ async function checkDuplicate(text: string) {
 /* =====================================================
    TEXT EXTRACTION
 ===================================================== */
-
 function extractText(context: Context) {
   return (context.selectedText || context.clipboardText || "").trim();
 }
@@ -165,25 +152,13 @@ function extractText(context: Context) {
 /* =====================================================
    CATEGORY
 ===================================================== */
-
 function detectCategory(text: string) {
   const lower = text.toLowerCase();
 
-  if (/(music|song|artist|album|band|genre|listen)/.test(lower)) {
-    return "music";
-  }
-
-  if (/(prefer|favorite|favourite|like|love|hate|enjoy)/.test(lower)) {
-    return "preference";
-  }
-
-  if (/(rust|typescript|javascript|python|coding|programming|framework)/.test(lower)) {
-    return "technology";
-  }
-
-  if (/(build|project|develop|working on|creating)/.test(lower)) {
-    return "project";
-  }
+  if (/(music|song|artist|album|band|genre|listen)/.test(lower)) return "music";
+  if (/(prefer|favorite|favourite|like|love|hate|enjoy)/.test(lower)) return "preference";
+  if (/(rust|typescript|javascript|python|coding|programming|framework|backend|frontend)/.test(lower)) return "technology";
+  if (/(build|project|develop|working on|creating)/.test(lower)) return "project";
 
   return "general";
 }
@@ -191,7 +166,6 @@ function detectCategory(text: string) {
 /* =====================================================
    CONFIDENCE
 ===================================================== */
-
 function calculateConfidence(text: string, category: string) {
   let score = 0;
 
@@ -206,17 +180,11 @@ function calculateConfidence(text: string, category: string) {
 /* =====================================================
    IMPORTANCE
 ===================================================== */
-
 function calculateImportance(text: string) {
   const lower = text.toLowerCase();
 
-  if (/(my|mine|favorite|favourite|prefer|always|never)/.test(lower)) {
-    return "high";
-  }
-
-  if (text.length > 300) {
-    return "medium";
-  }
+  if (/(my|mine|favorite|favourite|prefer|always|never)/.test(lower)) return "high";
+  if (text.length > 300) return "medium";
 
   return "normal";
 }
@@ -224,26 +192,24 @@ function calculateImportance(text: string) {
 /* =====================================================
    NOISE FILTER
 ===================================================== */
-
-function isNoise(text: string) {
+function isNoise(text: string, context: Context) {
   const lower = text.toLowerCase();
-
+  
   const patterns = [
-    "chunks",
-    "documentid",
-    "metadata",
-    'score":',
-    "isrelevant",
-    "createdat",
-    "updatedat",
-    "localhost",
-    "npx supermemory",
-    "bun run",
-    "npm run",
-    "package.json",
-    "node_modules",
-    "terminal",
+    "chunks", "documentid", "metadata", 'score":', "isrelevant",
+    "createdat", "updatedat", "localhost", "npx supermemory",
+    "bun run", "npm run", "package.json", "node_modules",
+    "terminal", "typescript", "javascript","query",
+    "memories",
+    "context",
+    "raw search",
+    "timing",
+    "total"
   ];
+
+  if (context.windowTitle?.includes("/assistant")) {
+    return true;
+  }
 
   return (
     text.length < 5 ||
@@ -251,12 +217,4 @@ function isNoise(text: string) {
     text.startsWith("{") ||
     text.length > 8000
   );
-}
-
-/* =====================================================
-   UTIL
-===================================================== */
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
