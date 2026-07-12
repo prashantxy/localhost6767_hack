@@ -199,12 +199,7 @@ function isNoise(text: string, context: Context) {
     "chunks", "documentid", "metadata", 'score":', "isrelevant",
     "createdat", "updatedat", "localhost", "npx supermemory",
     "bun run", "npm run", "package.json", "node_modules",
-    "terminal", "typescript", "javascript","query",
-    "memories",
-    "context",
-    "raw search",
-    "timing",
-    "total"
+    "terminal", "typescript", "javascript","query", "memories","context", "raw search","timing","total"
   ];
 
   if (context.windowTitle?.includes("/assistant")) {
