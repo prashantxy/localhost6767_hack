@@ -8,9 +8,6 @@ const client = new Supermemory({
 
 const CONTAINER = "memorylens_v2";
 
-/* =====================================================
-   STORE MEMORY
-===================================================== */
 export async function storeMemory(context: Context) {
   try {
     const text = extractText(context);
@@ -26,13 +23,13 @@ export async function storeMemory(context: Context) {
     const confidence = calculateConfidence(text, category);
 
     if (confidence < 0.4) {
-      console.log("🚫 Low confidence memory");
+      console.log(" Low confidence memory");
       return null;
     }
 
     const duplicate = await checkDuplicate(text);
     if (duplicate) {
-      console.log("⚠️ Duplicate skipped");
+      console.log(" Duplicate skipped");
       return null;
     }
 
@@ -52,18 +49,15 @@ export async function storeMemory(context: Context) {
       },
     });
 
-    console.log("✅ MEMORY STORED:", result.id);
+    console.log(" MEMORY STORED:", result.id);
     return result;
 
   } catch (error: any) {
-    console.error("❌ Store Error:", error.message);
+    console.error(" Store Error:", error.message);
     return null;
   }
 }
 
-/* =====================================================
-   SEARCH MEMORY
-===================================================== */
 export async function searchMemory(query: string) {
   try {
     if (!query.trim()) return [];
@@ -88,9 +82,6 @@ export async function searchMemory(query: string) {
   }
 }
 
-/* =====================================================
-   STORE + SEARCH
-===================================================== */
 export async function storeAndSearch(context: Context) {
   const text = extractText(context);
   if (!text) return [];
@@ -99,9 +90,6 @@ export async function storeAndSearch(context: Context) {
   return searchMemory(text);
 }
 
-/* =====================================================
-   MEMORY BUILDER
-===================================================== */
 function buildMemoryContent({
   text,
   context,
@@ -128,9 +116,6 @@ This memory contains useful long-term user context, preferences, interests, proj
 `.trim();
 }
 
-/* =====================================================
-   DUPLICATE CHECK
-===================================================== */
 async function checkDuplicate(text: string) {
   try {
     const result = await searchMemory(text);
@@ -142,16 +127,10 @@ async function checkDuplicate(text: string) {
   }
 }
 
-/* =====================================================
-   TEXT EXTRACTION
-===================================================== */
 function extractText(context: Context) {
   return (context.selectedText || context.clipboardText || "").trim();
 }
 
-/* =====================================================
-   CATEGORY
-===================================================== */
 function detectCategory(text: string) {
   const lower = text.toLowerCase();
 
@@ -163,9 +142,6 @@ function detectCategory(text: string) {
   return "general";
 }
 
-/* =====================================================
-   CONFIDENCE
-===================================================== */
 function calculateConfidence(text: string, category: string) {
   let score = 0;
 
@@ -177,9 +153,6 @@ function calculateConfidence(text: string, category: string) {
   return Math.min(score, 1);
 }
 
-/* =====================================================
-   IMPORTANCE
-===================================================== */
 function calculateImportance(text: string) {
   const lower = text.toLowerCase();
 
@@ -189,9 +162,6 @@ function calculateImportance(text: string) {
   return "normal";
 }
 
-/* =====================================================
-   NOISE FILTER
-===================================================== */
 function isNoise(text: string, context: Context) {
   const lower = text.toLowerCase();
   
