@@ -6,7 +6,7 @@ const client = new Supermemory({
   baseURL: "http://localhost:6767",
 });
 
-const CONTAINER = "memorylens";
+// const CONTAINER = "memorylens";
 
 
 /**
@@ -17,17 +17,20 @@ export async function storeMemory(context: Context) {
     const content = buildContent(context);
 
     const result = await client.add({
-      content,
-      containerTag: CONTAINER,
-      metadata: {
-        source: context.source,
-        application: context.app ?? "Unknown",
-        window: context.windowTitle ?? "",
-        timestamp: context.timestamp,
-      },
-    });
+  content,
+  metadata: {
+    source: context.source,
+    application: context.app ?? "Unknown",
+    window: context.windowTitle ?? "",
+    timestamp: context.timestamp,
+  },
+});
 
-    return result;
+console.log("\n========== ADD RESULT ==========");
+console.dir(result, { depth: null });
+console.log("================================\n");
+
+return result;
 
   } catch (err) {
     console.error("Store Error:", err);
@@ -43,11 +46,14 @@ export async function searchMemory(query: string) {
   try {
 
     const result = await client.search.execute({
-      q: query,
-      containerTag: CONTAINER,
-    });
+  q: query,
+});
 
-    return result.results;
+console.log("\n========== SEARCH RESULT ==========");
+console.dir(result, { depth: null });
+console.log("===================================\n");
+
+return result.results;
 
   } catch (err) {
     console.error("Search Error:", err);
