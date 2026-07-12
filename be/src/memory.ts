@@ -4,7 +4,8 @@ import type { Context } from "./types";
 
 const client = new Supermemory({
 
-  apiKey: process.env.SM_API_KEY!,
+  apiKey:
+    process.env.SM_API_KEY!,
 
   baseURL:
     "http://localhost:6767",
@@ -12,13 +13,16 @@ const client = new Supermemory({
 });
 
 
-const CONTAINER = "memorylens";
+const CONTAINER =
+  "memorylens_v2";
 
 
 
-/**
- * Store Memory
- */
+/* =====================================================
+   STORE MEMORY
+===================================================== */
+
+
 export async function storeMemory(
   context: Context
 ) {
@@ -26,8 +30,91 @@ export async function storeMemory(
   try {
 
 
+    const text =
+      extractText(context);
+
+
+
+    if (!text) {
+      return null;
+    }
+
+
+
+    if (isNoise(text)) {
+
+      console.log(
+        "🚫 Ignored noise"
+      );
+
+      return null;
+
+    }
+
+
+
+    const category =
+      detectCategory(text);
+
+
+
+    const importance =
+      calculateImportance(text);
+
+
+
+    const confidence =
+      calculateConfidence(
+        text,
+        category
+      );
+
+
+
+    if(confidence < 0.4) {
+
+      console.log(
+        "🚫 Low confidence memory"
+      );
+
+      return null;
+
+    }
+
+
+
+    const duplicate =
+      await checkDuplicate(text);
+
+
+
+    if(duplicate) {
+
+      console.log(
+        "⚠️ Duplicate skipped"
+      );
+
+      return null;
+
+    }
+
+
+
+
     const content =
-      buildContent(context);
+      buildMemoryContent({
+
+        text,
+
+        context,
+
+        category,
+
+        importance,
+
+      });
+
+
 
 
 
@@ -44,59 +131,59 @@ export async function storeMemory(
         metadata: {
 
           source:
-            context.source,
+            context.source ??
+            "unknown",
 
 
           application:
-            context.app ?? "Unknown",
+            context.app ??
+            "unknown",
 
 
           window:
-            context.windowTitle ?? "",
+            context.windowTitle ??
+            "",
+
+
+          category,
+
+
+          importance,
+
+
+          confidence,
 
 
           timestamp:
             context.timestamp,
 
 
-          category:
-            detectCategory(context),
-
-
         },
+
 
       });
 
 
 
-    console.log(
-      "\n========== ADD RESULT =========="
-    );
-
-
-    console.dir(
-      result,
-      {
-        depth:null
-      }
-    );
 
 
     console.log(
-      "================================\n"
+      "✅ MEMORY STORED:",
+      result.id
     );
+
 
 
     return result;
 
 
-
-  } catch(error) {
+  }
+  catch(error:any) {
 
 
     console.error(
-      "Store Error:",
-      error
+      "❌ Store Error:",
+      error.message
     );
 
 
@@ -111,9 +198,13 @@ export async function storeMemory(
 
 
 
-/**
- * Semantic Search
- */
+
+
+/* =====================================================
+   SEARCH MEMORY
+===================================================== */
+
+
 export async function searchMemory(
   query:string
 ) {
@@ -122,49 +213,65 @@ export async function searchMemory(
   try {
 
 
+    if(!query.trim()) {
+
+      return [];
+
+    }
+
+
+
     const result =
       await client.search.execute({
 
-        q:query,
+        q:
+        `
+        User preference and context.
+
+        Query:
+        ${query}
+        `,
 
 
         containerTag:
           CONTAINER,
 
 
+        limit:
+          8,
+
+
       });
 
 
 
-    console.log(
-      "\n========== SEARCH RESULT =========="
+
+
+    return (
+
+      result.results ?? []
+
+    )
+    .filter(
+      (item:any)=>
+      item.score > 0.45
+    )
+    .sort(
+      (
+        a:any,
+        b:any
+      ) =>
+      b.score - a.score
     );
 
 
-    console.dir(
-      result,
-      {
-        depth:null
-      }
-    );
-
-
-    console.log(
-      "===================================\n"
-    );
-
-
-
-    return result.results;
-
-
-
-  } catch(error) {
+  }
+  catch(error:any) {
 
 
     console.error(
-      "Search Error:",
-      error
+      "❌ Search Error:",
+      error.message
     );
 
 
@@ -179,12 +286,29 @@ export async function searchMemory(
 
 
 
-/**
- * Store + Search
- */
+
+
+/* =====================================================
+   STORE + SEARCH
+===================================================== */
+
+
 export async function storeAndSearch(
   context:Context
 ) {
+
+
+  const text =
+    extractText(context);
+
+
+
+  if(!text) {
+
+    return [];
+
+  }
+
 
 
   await storeMemory(
@@ -193,25 +317,14 @@ export async function storeAndSearch(
 
 
 
-  const query =
-    context.selectedText ||
-    context.clipboardText ||
-    "";
+  await sleep(
+    1500
+  );
 
 
 
-  if(
-    !query.trim()
-  ) {
-
-    return [];
-
-  }
-
-
-
-  return await searchMemory(
-    query
+  return searchMemory(
+    text
   );
 
 }
@@ -222,44 +335,68 @@ export async function storeAndSearch(
 
 
 
-/**
- * Create semantic memory text
- */
-function buildContent(
-  context:Context
+
+/* =====================================================
+   MEMORY BUILDER
+===================================================== */
+
+
+function buildMemoryContent(
+{
+
+text,
+
+context,
+
+category,
+
+importance
+
+}:
+{
+
+text:string;
+
+context:Context;
+
+category:string;
+
+importance:string;
+
+}
+
 ) {
 
 
-  const text =
-    context.selectedText ||
-    context.clipboardText ||
-    "";
+return `
+
+Memory Type:
+User Preference Memory
 
 
-
-  const category =
-    detectCategory(
-      context
-    );
-
-
-
-  return `
-
-User memory category:
+Category:
 ${category}
 
 
-User information:
+Importance:
+${importance}
+
+
+User Statement:
 ${text}
 
 
-Source application:
+Application:
 ${context.app ?? "Unknown"}
 
 
-Current context:
-${context.windowTitle ?? ""}
+Window:
+${context.windowTitle ?? "Unknown"}
+
+
+This memory describes stable user
+preferences, interests, habits,
+or useful long-term context.
 
 `;
 
@@ -271,110 +408,359 @@ ${context.windowTitle ?? ""}
 
 
 
-/**
- * Detect memory category
- */
-function detectCategory(
-  context:Context
+
+/* =====================================================
+   DUPLICATE CHECK
+===================================================== */
+
+
+async function checkDuplicate(
+text:string
 ) {
 
 
-  const text =
-    (
-      context.selectedText ??
-      context.clipboardText ??
-      ""
-
-    ).toLowerCase();
+try {
 
 
-
-  const app =
-    (
-      context.app ??
-      ""
-
-    ).toLowerCase();
+const result =
+await searchMemory(
+text
+);
 
 
 
+if(!result.length) {
 
-  // music / media
+ return false;
 
-  if(
-    app.includes("spotify") ||
-    app.includes("youtube") ||
-    app.includes("music") ||
-    text.match(
-      /(song|music|artist|album|playlist|listen)/i
-    )
-  ) {
-
-    return "music";
-
-  }
+}
 
 
 
+return (
+(result[0]?.score ?? 0)
+>
+0.88
+);
 
-  // coding
 
-  if(
 
-    text.match(
-      /(const|let|function|class|import|export|typescript|javascript|rust|python)/i
-    )
+}
+catch {
 
-    ||
+return false;
 
-    app.includes("code")
+}
 
-  ) {
 
-    return "developer";
-
-  }
+}
 
 
 
 
 
-  // errors / debugging
-
-  if(
-
-    text.match(
-      /(error|failed|exception|bug|cannot|issue)/i
-
-    )
-
-  ) {
-
-    return "problem-solving";
-
-  }
 
 
 
+/* =====================================================
+   TEXT EXTRACTION
+===================================================== */
 
-  // personal preferences
 
-  if(
+function extractText(
+context:Context
+) {
 
-    text.match(
-      /(i like|i love|my favourite|i prefer|i hate)/i
 
-    )
+return (
 
-  ) {
+context.selectedText ||
 
-    return "preference";
+context.clipboardText ||
 
-  }
+""
+
+)
+.trim();
+
+
+}
 
 
 
 
-  return "general";
+
+
+
+
+/* =====================================================
+   CATEGORY
+===================================================== */
+
+
+function detectCategory(
+text:string
+) {
+
+
+const lower =
+text.toLowerCase();
+
+
+
+if(
+/(music|song|artist|album|band|genre|listen)/
+.test(lower)
+){
+
+return "music";
+
+}
+
+
+
+
+if(
+/(prefer|favorite|favourite|like|love|hate|enjoy)/
+.test(lower)
+){
+
+return "preference";
+
+}
+
+
+
+
+if(
+/(rust|typescript|javascript|python|coding|programming|framework)/
+.test(lower)
+){
+
+return "technology";
+
+}
+
+
+
+
+if(
+/(build|project|develop|working on|creating)/
+.test(lower)
+){
+
+return "project";
+
+}
+
+
+
+
+return "general";
+
+
+}
+
+
+
+
+
+
+
+
+/* =====================================================
+   CONFIDENCE
+===================================================== */
+
+
+function calculateConfidence(
+text:string,
+category:string
+) {
+
+
+let score = 0;
+
+
+
+if(text.length > 15)
+score += 0.2;
+
+
+
+if(
+/(my|i|mine|favorite|favourite|prefer|like|love)/
+.test(text.toLowerCase())
+)
+score += 0.4;
+
+
+
+if(category !== "general")
+score += 0.2;
+
+
+
+if(text.split(" ").length > 5)
+score += 0.2;
+
+
+
+return Math.min(
+score,
+1
+);
+
+
+}
+
+
+
+
+
+
+
+
+/* =====================================================
+   IMPORTANCE
+===================================================== */
+
+
+function calculateImportance(
+text:string
+) {
+
+
+const lower =
+text.toLowerCase();
+
+
+
+if(
+/(my|mine|favorite|favourite|prefer|always|never)/
+.test(lower)
+){
+
+return "high";
+
+}
+
+
+
+if(
+text.length > 300
+){
+
+return "medium";
+
+}
+
+
+
+return "normal";
+
+
+}
+
+
+
+
+
+
+
+
+/* =====================================================
+   NOISE FILTER
+===================================================== */
+
+
+function isNoise(
+text:string
+) {
+
+
+const lower =
+text.toLowerCase();
+
+
+
+const patterns = [
+
+"chunks",
+
+"documentid",
+
+"metadata",
+
+"score\":",
+
+"isrelevant",
+
+"createdat",
+
+"updatedat",
+
+"localhost",
+
+"npx supermemory",
+
+"bun run",
+
+"npm run",
+
+"package.json",
+
+"node_modules",
+
+"terminal"
+
+];
+
+
+
+return (
+
+text.length < 5 ||
+
+patterns.some(
+p =>
+lower.includes(p)
+)
+||
+
+text.startsWith("{")
+
+||
+
+text.length > 8000
+
+);
+
+
+}
+
+
+
+
+
+
+
+
+/* =====================================================
+   UTIL
+===================================================== */
+
+
+function sleep(
+ms:number
+){
+
+return new Promise(
+resolve =>
+setTimeout(
+resolve,
+ms
+)
+);
 
 }
