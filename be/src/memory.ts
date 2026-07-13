@@ -14,7 +14,7 @@ export async function storeMemory(context: Context) {
     if (!text) return null;
 
     if (isNoise(text, context)) {
-      console.log("🚫 Ignored noise");
+      console.log("Ignored noise");
       return null;
     }
 
@@ -51,7 +51,6 @@ export async function storeMemory(context: Context) {
 
     console.log(" MEMORY STORED:", result.id);
     return result;
-
   } catch (error: any) {
     console.error(" Store Error:", error.message);
     return null;
