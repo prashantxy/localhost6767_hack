@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-
+import dotenv from "dotenv";
 import { logger } from "./logger";
 import { startWebSocketServer } from "./ws";
 import { watchClipboard } from "./clipboard";
@@ -10,7 +10,7 @@ import { randomUUID } from "crypto";
 
 import assistantRouter from "./routes/assistant";
 
-
+dotenv.config();
 const app = express();
 
 

@@ -1,55 +1,117 @@
 import { searchMemory } from "./memory";
+import OpenAI from "openai";
+
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 
 export async function askMemoryLens(
-  query: string
-) {
+  query:string
+){
 
-  if (!query.trim()) {
+  const memories =
+    await searchMemory(query);
+
+
+  const context =
+    memories
+      .filter(
+        m=>m.score > 0.45
+      )
+      .map(
+        (m,i)=>
+`
+Memory ${i+1}
+
+${m.content}
+
+Source:
+${m.metadata.application ?? "unknown"}
+
+Time:
+${new Date(
+ m.metadata.timestamp
+).toLocaleString()}
+`
+      )
+      .join("\n\n");
+
+
+
+  if(!context){
 
     return {
       query,
-      context: "",
-      memories: [],
+      answer:
+      "I don't have any memories related to this.",
+      sources:[],
+      memories:[]
     };
 
   }
 
 
-  const memories =
-    await searchMemory(query);
 
-    console.log("MEMORIES BEFORE FILTER:", memories);
+  const completion =
+    await openai.chat.completions.create({
+
+      model:"gpt-4.1-mini",
+
+      messages:[
+
+        {
+          role:"system",
+          content:
+`
+You are MemoryLens.
+
+Answer only using provided memories.
+
+Always mention sources with timestamps.
+
+If memory does not contain the answer,
+say you don't know.
+`
+        },
+
+        {
+          role:"user",
+          content:
+`
+Question:
+${query}
 
 
-  const filteredMemories =
-    memories.filter(
-      (memory:any) =>
-        memory.score > 0.45
-    );
+Memories:
+${context}
+`
+        }
+
+      ]
+
+    });
 
 
 
-  const context =
-    filteredMemories
-      .map(
-        (memory:any) =>
-          memory.content
-      )
-      .join("\n\n")
-      .slice(0,4000);
+return {
 
+query,
 
+answer:
+completion.choices[0]?.message?.content ?? "Unable to generate answer",
 
-  return {
+sources:
+memories.map(m=>({
+ content:m.content,
+ timestamp:
+ m.metadata.timestamp
+})),
 
-    query,
+memories
 
-    context,
+};
 
-    memories:
-      filteredMemories,
-
-  };
 
 }

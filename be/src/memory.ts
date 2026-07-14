@@ -6,6 +6,16 @@ const client = new Supermemory({
   baseURL: "http://localhost:6767",
 });
 
+console.log(
+  "KEY:",
+  process.env.SM_API_KEY?.slice(0,10)
+);
+
+console.log(
+  "URL:",
+  process.env.SM_API_URL
+);
+
 const CONTAINER = "memorylens_v2";
 
 export async function storeMemory(context: Context) {
