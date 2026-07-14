@@ -78,21 +78,37 @@ export async function searchMemory(query: string) {
   try {
     if (!query.trim()) return [];
 
-    const result = await client.search.execute({
+    const result = await client.search.memories({
       q: query,
       containerTag: CONTAINER,
       limit: 10,
     });
+
 
     console.log(
       "SEARCH RAW:",
       JSON.stringify(result, null, 2)
     );
 
-    return result.results ?? [];
 
-  } catch (error: any) {
-    console.error("Search Error:", error.message);
+    return (result.results ?? []).map((item:any)=>({
+      id: item.id,
+
+      content: item.memory ?? "",
+
+      score: item.similarity ?? 0,
+
+      metadata: item.metadata ?? {},
+    }));
+
+
+  } catch(error:any){
+
+    console.error(
+      "Search Error:",
+      error.message
+    );
+
     return [];
   }
 }

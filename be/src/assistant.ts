@@ -19,6 +19,7 @@ export async function askMemoryLens(
   const memories =
     await searchMemory(query);
 
+    console.log("MEMORIES BEFORE FILTER:", memories);
 
 
   const filteredMemories =
