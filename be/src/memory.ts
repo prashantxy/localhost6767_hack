@@ -84,22 +84,18 @@ export async function searchMemory(query: string) {
       limit: 10,
     });
 
-    return (result.results ?? []).map((item: any) => ({
-      id: item.documentId,
-      content:
-        item.chunks
-          ?.map((chunk: any) => chunk.content)
-          .join("\n") ?? "",
-      title: item.title ?? "",
-      score: item.score ?? 0,
-      metadata: item.metadata ?? {},
-    }));
+    console.log(
+      "SEARCH RAW:",
+      JSON.stringify(result, null, 2)
+    );
+
+    return result.results ?? [];
+
   } catch (error: any) {
     console.error("Search Error:", error.message);
     return [];
   }
 }
-
 export async function storeAndSearch(context: Context) {
   const text = extractText(context);
 
@@ -142,11 +138,10 @@ async function checkDuplicate(text: string) {
 
     if (!result.length) return false;
 
-    const top = result[0];
+    const top: any = result[0];
 
-    if (!top) return false;
+    return (top.score ?? 0) > 0.92;
 
-    return top.score > 0.92;
   } catch {
     return false;
   }
