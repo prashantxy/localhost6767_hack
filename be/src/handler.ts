@@ -40,8 +40,14 @@ export async function handleIntent(
 
     case "store": {
 
-      await storeMemory(context);
+      const result = await storeMemory(context);
 
+       if (!result) {
+         logger.error("Memory Store Failed");
+          return;
+         }
+
+      
       stats.increment("stored");
 
       broadcast("stored", context);
@@ -79,27 +85,37 @@ export async function handleIntent(
       return;
     }
 
-    case "store_search": {
+   case "store_search": {
 
-      const memories =
-        await storeAndSearch(context);
+  const stored = await storeMemory(context);
 
-      const ranked =
-        rankMemories(memories);
+  if (!stored) {
+    logger.error("Store + Search Failed");
+    return;
+  }
 
-      stats.increment("stored");
-      stats.increment("searched");
+  const memories = await searchMemory(
+    context.selectedText ??
+    context.clipboardText ??
+    context.windowTitle ??
+    ""
+  );
 
-      broadcast("results", {
-        context,
-        memories: ranked,
-      });
+  const ranked = rankMemories(memories);
 
-      logger.success(
-        `Stored + Returned ${ranked.length} memories`
-      );
+  stats.increment("stored");
+  stats.increment("searched");
 
-      return;
-    }
+  broadcast("results", {
+    context,
+    memories: ranked,
+  });
+
+  logger.success(
+    `Stored + Returned ${ranked.length} memories`
+  );
+
+  return;
+}
   }
 }

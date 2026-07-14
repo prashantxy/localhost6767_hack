@@ -11,7 +11,17 @@ const CONTAINER = "memorylens_v2";
 export async function storeMemory(context: Context) {
   try {
     const text = extractText(context);
+
     if (!text) return null;
+
+    // Prevent recursive memory pollution
+    if (
+      text.includes('"query"') &&
+      text.includes('"memories"')
+    ) {
+      console.log("Ignored search response");
+      return null;
+    }
 
     if (isNoise(text, context)) {
       console.log("Ignored noise");
@@ -23,17 +33,23 @@ export async function storeMemory(context: Context) {
     const confidence = calculateConfidence(text, category);
 
     if (confidence < 0.4) {
-      console.log(" Low confidence memory");
+      console.log("Low confidence memory");
       return null;
     }
 
     const duplicate = await checkDuplicate(text);
+
     if (duplicate) {
-      console.log(" Duplicate skipped");
+      console.log("Duplicate skipped");
       return null;
     }
 
-    const content = buildMemoryContent({ text, context, category, importance });
+    const content = buildMemoryContent({
+      text,
+      context,
+      category,
+      importance,
+    });
 
     const result = await client.add({
       content,
@@ -49,10 +65,11 @@ export async function storeMemory(context: Context) {
       },
     });
 
-    console.log(" MEMORY STORED:", result.id);
+    console.log("MEMORY STORED:", result.id);
+
     return result;
   } catch (error: any) {
-    console.error(" Store Error:", error.message);
+    console.error("Store Error:", error.message);
     return null;
   }
 }
@@ -69,23 +86,27 @@ export async function searchMemory(query: string) {
 
     return (result.results ?? []).map((item: any) => ({
       id: item.documentId,
-      content: item.chunks?.map((chunk: any) => chunk.content).join("\n") ?? "",
+      content:
+        item.chunks
+          ?.map((chunk: any) => chunk.content)
+          .join("\n") ?? "",
       title: item.title ?? "",
       score: item.score ?? 0,
       metadata: item.metadata ?? {},
     }));
-
   } catch (error: any) {
-    console.error("❌ Search Error:", error.message);
+    console.error("Search Error:", error.message);
     return [];
   }
 }
 
 export async function storeAndSearch(context: Context) {
   const text = extractText(context);
+
   if (!text) return [];
 
   await storeMemory(context);
+
   return searchMemory(text);
 }
 
@@ -118,35 +139,72 @@ This memory contains useful long-term user context, preferences, interests, proj
 async function checkDuplicate(text: string) {
   try {
     const result = await searchMemory(text);
+
     if (!result.length) return false;
 
-    return (result[0]?.score ?? 0) > 0.88;
+    const top = result[0];
+
+    if (!top) return false;
+
+    return top.score > 0.92;
   } catch {
     return false;
   }
 }
 
 function extractText(context: Context) {
-  return (context.selectedText || context.clipboardText || "").trim();
+  return (
+    context.selectedText ||
+    context.clipboardText ||
+    ""
+  ).trim();
 }
 
 function detectCategory(text: string) {
   const lower = text.toLowerCase();
 
-  if (/(music|song|artist|album|band|genre|listen)/.test(lower)) return "music";
-  if (/(prefer|favorite|favourite|like|love|hate|enjoy)/.test(lower)) return "preference";
-  if (/(rust|typescript|javascript|python|coding|programming|framework|backend|frontend)/.test(lower)) return "technology";
-  if (/(build|project|develop|working on|creating)/.test(lower)) return "project";
+  if (
+    /(music|song|artist|album|band|genre|listen)/.test(lower)
+  )
+    return "music";
+
+  if (
+    /(prefer|favorite|favourite|like|love|hate|enjoy)/.test(lower)
+  )
+    return "preference";
+
+  if (
+    /(rust|typescript|javascript|python|coding|programming|framework|backend|frontend)/.test(
+      lower
+    )
+  )
+    return "technology";
+
+  if (
+    /(build|project|develop|working on|creating)/.test(lower)
+  )
+    return "project";
 
   return "general";
 }
 
-function calculateConfidence(text: string, category: string) {
+function calculateConfidence(
+  text: string,
+  category: string
+) {
   let score = 0;
 
   if (text.length > 15) score += 0.2;
-  if (/(my|i|mine|favorite|favourite|prefer|like|love)/.test(text.toLowerCase())) score += 0.4;
+
+  if (
+    /(my|i|mine|favorite|favourite|prefer|like|love)/.test(
+      text.toLowerCase()
+    )
+  )
+    score += 0.4;
+
   if (category !== "general") score += 0.2;
+
   if (text.split(" ").length > 5) score += 0.2;
 
   return Math.min(score, 1);
@@ -155,30 +213,107 @@ function calculateConfidence(text: string, category: string) {
 function calculateImportance(text: string) {
   const lower = text.toLowerCase();
 
-  if (/(my|mine|favorite|favourite|prefer|always|never)/.test(lower)) return "high";
+  if (
+    /(my|mine|favorite|favourite|prefer|always|never)/.test(
+      lower
+    )
+  )
+    return "high";
+
   if (text.length > 300) return "medium";
 
   return "normal";
 }
 
-function isNoise(text: string, context: Context) {
+function isNoise(
+  text: string,
+  context: Context
+) {
   const lower = text.toLowerCase();
-  
-  const patterns = [
-    "chunks", "documentid", "metadata", 'score":', "isrelevant",
-    "createdat", "updatedat", "localhost", "npx supermemory",
-    "bun run", "npm run", "package.json", "node_modules",
-    "terminal", "typescript", "javascript","query", "memories","context", "raw search","timing","total"
-  ];
 
-  if (context.windowTitle?.includes("/assistant")) {
+  // Ignore MemoryLens itself
+  if (
+    context.windowTitle
+      ?.toLowerCase()
+      .includes("memorylens") ||
+    context.windowTitle
+      ?.toLowerCase()
+      .includes("localhost:3000") ||
+    context.windowTitle
+      ?.toLowerCase()
+      .includes("/chat") ||
+    context.app === "Postman"
+  ) {
     return true;
   }
 
-  return (
-    text.length < 5 ||
-    patterns.some((p) => lower.includes(p)) ||
-    text.startsWith("{") ||
-    text.length > 8000
-  );
+  // Ignore search results / recursive memories
+  const searchPatterns = [
+    '"query"',
+    '"memories"',
+    '"results"',
+    '"chunks"',
+    '"documentid"',
+    '"score"',
+    '"metadata"',
+    '"createdat"',
+    '"updatedat"',
+    '"isrelevant"',
+    '"position"',
+  ];
+
+  if (
+    searchPatterns.some((pattern) =>
+      lower.includes(pattern)
+    )
+  ) {
+    return true;
+  }
+
+  // Ignore terminal noise
+  const terminalPatterns = [
+    "npx supermemory",
+    "bun run",
+    "npm run",
+    "pnpm",
+    "yarn",
+    "node_modules",
+    "package.json",
+  ];
+
+  if (
+    terminalPatterns.some((pattern) =>
+      lower.includes(pattern)
+    )
+  ) {
+    return true;
+  }
+
+  // Ignore raw JSON dumps
+  if (
+    text.trim().startsWith("{") ||
+    text.trim().startsWith("[")
+  ) {
+    return true;
+  }
+
+  // Ignore huge dumps
+  if (text.length > 5000) {
+    return true;
+  }
+
+  // Ignore tiny snippets
+  if (text.length < 10) {
+    return true;
+  }
+
+  // Ignore short code snippets
+  if (
+    context.app === "Code" &&
+    text.length < 120
+  ) {
+    return true;
+  }
+
+  return false;
 }
