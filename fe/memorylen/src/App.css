@@ -114,3 +114,10 @@ button {
     background-color: #0f0f0f69;
   }
 }
+html, 
+body, 
+#root {
+  background-color: transparent !important;
+  /* Optional: Prevents text selection cursor from appearing if the user clicks the empty transparent space */
+  user-select: none; 
+}
