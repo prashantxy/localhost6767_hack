@@ -10,19 +10,29 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "macOSPrivateApi": true, 
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "MemoryLens",
         "width": 680,
         "height": 550,
         "center": true,
+
+        "visible": false,
+
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
-        "visible": true,
-        "skipTaskbar": false,
-        "shadow": false
+
+        "skipTaskbar": true,
+        "shadow": false,
+
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": true,
+
+        "focus": true
       }
     ],
     "security": {
