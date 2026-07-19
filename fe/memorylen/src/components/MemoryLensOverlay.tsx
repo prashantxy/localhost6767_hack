@@ -35,6 +35,8 @@ const MemoryLensOverlay: React.FC = () => {
         await appWindow.current.hide();
         return;
       }
+     await appWindow.current.show();
+     await appWindow.current.setFocus();
 
       setTimeout(() => {
         inputRef.current?.focus();

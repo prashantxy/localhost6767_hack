@@ -1,9 +1,8 @@
-import React from 'react';
-import MemoryLensOverlay from './components/MemoryLensOverlay';
+import MemoryLensOverlay from "./components/MemoryLensOverlay";
 
 function App() {
   return (
-    <MemoryLensOverlay />
+   <MemoryLensOverlay/>
   );
 }
 
